@@ -425,7 +425,7 @@ export default function SecIncentiveForm({ initialSecId = '' }) {
               <button
                 type="submit"
                 disabled={!!imeiError || !!duplicateError || !imeiNumber || imeiNumber.length !== 15 || isCheckingDuplicate}
-                className="w-full bg-gradient-to-r from-gray-900 to-black text-white font-semibold py-4 rounded-2xl hover:from-black hover:to-gray-900 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all text-base"
+                className="w-full bg-black text-white font-semibold py-4 rounded-2xl hover:bg-gray-900 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all text-base"
               >
                 Submit
               </button>
