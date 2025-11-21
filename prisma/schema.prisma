@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ABM
+  ASE
+  ZBM
+  ZSE
+  SEC
+  SAMSUNG_ADMINISTRATOR
+  ZOPPER_ADMINISTRATOR
+}
+
+enum Validation {
+  APPROVED
+  PENDING
+  BLOCKED
+}
+
+model Store {
+  id    String @id @map("_id")
+  name  String
+  city  String?
+  state String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  username String @unique
+  password String
+  role     Role
+
+  // admin-based approval status for this user (PENDING by default, APPROVED/BLOCKED set by admin)
+  validation Validation @default(PENDING)
+
+  // all signup form fields except username, password and role (store mapping + user mapping)
+  metadata Json?
+
+  abmProfile          ABM?          @relation("UserABM")
+  aseProfile          ASE?          @relation("UserASE")
+  zbmProfile          ZBM?          @relation("UserZBM")
+  zseProfile          ZSE?          @relation("UserZSE")
+  secProfile          SEC?          @relation("UserSEC")
+  samsungAdminProfile SamsungAdmin? @relation("UserSamsungAdmin")
+  zopperAdminProfile  ZopperAdmin?  @relation("UserZopperAdmin")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ABM {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String
+  phone    String
+
+  storeIds String[]
+  zbmId    String @db.ObjectId
+
+  user User @relation("UserABM", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ASE {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String
+  phone    String
+
+  storeIds String[]
+  zseId    String @db.ObjectId
+
+  user User @relation("UserASE", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ZBM {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String
+  phone    String
+
+  region String?
+
+  user User @relation("UserZBM", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ZSE {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String
+  phone    String
+
+  region String?
+
+  user User @relation("UserZSE", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SEC {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String?
+
+  phone String @unique
+
+  storeId String
+
+  user User @relation("UserSEC", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Otp {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  phone     String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+model SamsungAdmin {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String
+  phone    String
+
+  user User @relation("UserSamsungAdmin", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ZopperAdmin {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  fullName String
+  phone    String
+
+  user User @relation("UserZopperAdmin", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -11,11 +11,10 @@ export default function SECLogin() {
   const [agreed, setAgreed] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [validationMessage, setValidationMessage] = useState('');
   const [isValidNumber, setIsValidNumber] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -36,8 +35,9 @@ export default function SECLogin() {
     }
   };
 
-  const handleSendOTP = (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     const digitsOnly = phoneNumber.replace(/\D/g, '').slice(0, 10);
 
@@ -49,149 +49,88 @@ export default function SECLogin() {
       return;
     }
 
-    setPhoneNumber(digitsOnly);
-    setValidationMessage('Valid number');
-    setIsValidNumber(true);
-    alert(`Valid number: ${digitsOnly}`);
-
     if (!agreed) {
       alert('Please agree to the Terms of Service and Privacy Policy');
       return;
     }
 
-    // Handle OTP sending logic here
-    console.log('Sending OTP to:', digitsOnly);
-    setOtpSent(true);
+    setPhoneNumber(digitsOnly);
+    setValidationMessage('Valid number');
+    setIsValidNumber(true);
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/auth/sec/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber: digitsOnly }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        setError(data?.error || 'Failed to send OTP');
+        return;
+      }
+
+      // OTP will be visible in the terminal logs on the server.
+      setOtpSent(true);
+    } catch (err) {
+      console.error('Error sending OTP', err);
+      setError('Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleVerifyOTP = (e: React.FormEvent) => {
+  const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (!otp) {
       alert('Please enter your OTP');
       return;
     }
-    // Handle OTP verification logic here
-    console.log('Verifying OTP:', otp);
-    
-    // Simulate checking if user is new (in real app, this would come from API)
-    const isNewUser = true; // Replace with actual API check
-    
-    if (isNewUser) {
-      setShowProfileSetup(true);
-    } else {
-      // Navigate to SEC landing page for existing users
+
+    const digitsOnly = phoneNumber.replace(/\D/g, '').slice(0, 10);
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/auth/sec/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber: digitsOnly, otp }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        setError(data?.error || 'Invalid OTP');
+        return;
+      }
+
+      // OTP verified successfully; redirect to SEC landing page.
       router.push('/SEC/home');
+    } catch (err) {
+      console.error('Error verifying OTP', err);
+      setError('Failed to verify OTP. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
-
-  const handleBackToOTP = () => {
-    setShowProfileSetup(false);
-  };
-
-  const handleProfileNext = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!firstName || !lastName) {
-      alert('Please enter both first name and last name');
-      return;
-    }
-    // Handle profile creation here
-    console.log('Profile setup:', { firstName, lastName });
-    // Navigate to SEC Landing Page
-    router.push('/SEC/home');
-  };
-
-  // Show profile setup screen for new users
-  if (showProfileSetup) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="w-full max-w-xl">
-          <div className="mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
-              What&apos;s your name?
-            </h1>
-            <p className="text-lg text-gray-500">
-              Let us know how to properly address you
-            </p>
-          </div>
-
-          <form onSubmit={handleProfileNext} className="space-y-6">
-            <div>
-              <label
-                htmlFor="firstName"
-                className="block text-base font-medium text-gray-900 mb-2"
-              >
-                First name
-              </label>
-              <input
-                type="text"
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Enter first name"
-                className="w-full px-5 py-4 border-2 border-gray-900 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 text-base text-black placeholder:text-gray-400"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="lastName"
-                className="block text-base font-medium text-gray-900 mb-2"
-              >
-                Last name
-              </label>
-              <input
-                type="text"
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Enter last name"
-                style={{ backgroundColor: '#F5F6F8' }}
-                className="w-full px-5 py-4 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 text-base text-black placeholder:text-gray-400"
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-4">
-              <button
-                type="button"
-                onClick={handleBackToOTP}
-                className="w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-              >
-                <svg
-                  className="w-5 h-5 text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-
-              <button
-                type="submit"
-                className="px-12 py-3.5 bg-black text-white font-medium rounded-full hover:bg-gray-800 transition-colors text-base"
-              >
-                Next
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
             SC+ Engagement Portal
           </h1>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">SEC Login</h2>
+          <h2 className="text-gray-500">SEC Login</h2>
         </div>
 
         <form
@@ -202,7 +141,7 @@ export default function SECLogin() {
           <div>
             <label
               htmlFor="phone"
-              className="block text-sm font-medium text-gray-600 uppercase mb-3"
+              className="block text-sm font-medium text-gray-900 mb-2"
             >
               Phone Number
             </label>
@@ -255,7 +194,7 @@ export default function SECLogin() {
                 className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer"
               />
             </div>
-            <label htmlFor="terms" className="ml-3 text-base text-gray-700">
+            <label htmlFor="terms" className="ml-3 text-sm text-gray-600">
               I have read and agree to the{' '}
               <Link
                 href="/terms"
@@ -277,7 +216,7 @@ export default function SECLogin() {
             <div>
               <label
                 htmlFor="otp"
-                className="block text-sm font-medium text-gray-600 uppercase mb-3"
+                className="block text-sm font-medium text-gray-900 mb-2"
               >
                 OTP
               </label>
@@ -290,7 +229,7 @@ export default function SECLogin() {
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="Enter your OTP"
-                className="w-full px-4 py-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-black placeholder:text-gray-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400"
               />
             </div>
           )}
@@ -303,8 +242,8 @@ export default function SECLogin() {
           </button>
         </form>
 
-        <div className="mt-8 text-center space-y-3">
-          <p className="text-gray-600">
+        <div className="mt-6 text-center space-y-3">
+          <p className="text-sm text-gray-600">
             Different Role?{' '}
             <Link
               href="/login/role"
@@ -313,7 +252,7 @@ export default function SECLogin() {
               Go to Role Login
             </Link>
           </p>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-600">
             Need an account?{' '}
             <Link
               href="/signup"
@@ -324,16 +263,17 @@ export default function SECLogin() {
           </p>
         </div>
 
-        <div className="mt-12 text-center">
-          <div className="flex items-center justify-center gap-2 text-gray-500">
+        <div className="mt-8 text-center">
+          <div className="flex items-center justify-center text-gray-500 gap-1">
             <span className="text-base">Powered by</span>
             <Image
-              src="/zopper-logo.svg"
-              alt="Zopper"
-              width={120}
-              height={30}
+              src="/zopper-icon.png"
+              alt="Zopper icon"
+              width={24}
+              height={24}
               className="inline-block"
             />
+            <span className="text-base font-semibold text-gray-900">Zopper</span>
           </div>
         </div>
       </div>

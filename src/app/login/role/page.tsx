@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -8,15 +9,75 @@ export default function RoleLogin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (!username || !password) {
-      alert('Please enter both username and password');
+      setError('Please enter both username and password');
       return;
     }
-    // Handle login logic here
-    console.log('Logging in with:', { username, password });
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data?.error || 'Login failed');
+        return;
+      }
+
+      // Store auth info in localStorage.
+      // This only contains `role` and the role-specific `profile` object,
+      // so the raw User model (id, username, metadata, etc.) is never exposed on the client.
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('authUser', JSON.stringify(data.user));
+      }
+
+      // Basic redirect by role; adjust targets as needed.
+      switch (data.user.role) {
+        case 'ABM':
+          router.push('/ABM');
+          break;
+        case 'ASE':
+          router.push('/ASE');
+          break;
+        case 'ZBM':
+          router.push('/ZSM');
+          break;
+        case 'ZSE':
+          router.push('/ZSE');
+          break;
+        case 'SEC':
+          router.push('/SEC/home');
+          break;
+        case 'SAMSUNG_ADMINISTRATOR':
+          router.push('/Samsung-Administrator');
+          break;
+        case 'ZOPPER_ADMINISTRATOR':
+          router.push('/Zopper-Administrator');
+          break;
+        default:
+          router.push('/');
+      }
+    } catch (err) {
+      console.error('Error logging in', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,6 +89,11 @@ export default function RoleLogin() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+              {error}
+            </p>
+          )}
           <div>
             <label
               htmlFor="username"
@@ -107,9 +173,10 @@ export default function RoleLogin() {
 
           <button
             type="submit"
-            className="w-full bg-black text-white font-semibold py-3 rounded-lg hover:bg-gray-800 transition-colors"
+            disabled={loading}
+            className="w-full bg-black text-white font-semibold py-3 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Sign In
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
@@ -135,15 +202,16 @@ export default function RoleLogin() {
         </div>
 
         <div className="mt-8 text-center">
-          <div className="flex items-center justify-center gap-2 text-gray-500">
+          <div className="flex items-center justify-center text-gray-500 gap-1">
             <span className="text-base">Powered by</span>
             <Image
-              src="/zopper-logo.svg"
-              alt="Zopper"
-              width={120}
-              height={30}
+              src="/zopper-icon.png"
+              alt="Zopper icon"
+              width={24}
+              height={24}
               className="inline-block"
             />
+            <span className="text-base font-semibold text-gray-900">Zopper</span>
           </div>
         </div>
       </div>
