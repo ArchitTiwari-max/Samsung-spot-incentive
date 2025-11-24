@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import SECHeader from '@/components/sec/SECHeader';
 import SECFooter from '@/components/sec/SECFooter';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -21,6 +23,15 @@ export default function ProfilePage() {
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [chequeFile, setChequeFile] = useState<File | null>(null);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login/sec');
+    } catch (err) {
+      console.error('Error during logout', err);
+    }
+  };
 
   useEffect(() => {
     // Load user data from localStorage
@@ -60,11 +71,20 @@ export default function ProfilePage() {
       <main className="flex-1 overflow-y-auto pb-32">
         <div className="px-4 pt-4 pb-6">
           {/* Page Title */}
-          <div className="mb-5">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Your Profile</h1>
-            <p className="text-sm text-gray-600">
-              Please complete your verification & payout details
-            </p>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Your Profile</h1>
+              <p className="text-sm text-gray-600">
+                Please complete your verification & payout details
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Logout
+            </button>
           </div>
 
           {/* SECTION 1: Personal Info */}

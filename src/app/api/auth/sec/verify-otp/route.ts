@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { verifySecOtp } from '@/lib/secOtpStore';
 
 // POST /api/auth/sec/verify-otp
 // Body: { phoneNumber: string; otp: string }
-// Verifies the OTP stored in the database for the given phone number.
+// Verifies the OTP stored in the in-memory store for the given phone number.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -20,22 +20,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 });
     }
 
-    const record = await prisma.otp.findFirst({
-      where: { phone: normalized },
-      orderBy: { createdAt: 'desc' },
-    });
+    const isValid = verifySecOtp(normalized, otp);
 
-    if (!record) {
+    if (!isValid) {
       return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 });
     }
-
-    const now = new Date();
-    if (record.expiresAt < now || record.code !== otp) {
-      return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 });
-    }
-
-    // Mark as verified and/or delete so it cannot be reused.
-    await prisma.otp.delete({ where: { id: record.id } });
 
     // For now we only confirm OTP success; later you can extend this
     // to issue auth tokens and return user info similar to /api/auth/login.

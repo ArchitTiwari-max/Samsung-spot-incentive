@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,10 +11,28 @@ export default function SECLogin() {
   const [agreed, setAgreed] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
+  const [resendTimer, setResendTimer] = useState(0); // seconds remaining before user can resend
   const [validationMessage, setValidationMessage] = useState('');
   const [isValidNumber, setIsValidNumber] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Countdown for resend OTP
+  useEffect(() => {
+    if (!otpSent || resendTimer <= 0) return;
+
+    const id = setInterval(() => {
+      setResendTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(id);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [otpSent, resendTimer]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -77,9 +95,51 @@ export default function SECLogin() {
 
       // OTP will be visible in the terminal logs on the server.
       setOtpSent(true);
+      setResendTimer(60); // 1 minute cooldown before user can resend
     } catch (err) {
       console.error('Error sending OTP', err);
       setError('Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    // Only allow resend if timer has finished
+    if (resendTimer > 0 || !otpSent) return;
+
+    setError(null);
+
+    const digitsOnly = phoneNumber.replace(/\D/g, '').slice(0, 10);
+
+    if (!digitsOnly || digitsOnly.length < 10) {
+      setValidationMessage('Invalid number');
+      setIsValidNumber(false);
+      alert('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/auth/sec/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber: digitsOnly }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        setError(data?.error || 'Failed to resend OTP');
+        return;
+      }
+
+      setResendTimer(60); // restart cooldown
+    } catch (err) {
+      console.error('Error resending OTP', err);
+      setError('Failed to resend OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -231,14 +291,42 @@ export default function SECLogin() {
                 placeholder="Enter your OTP"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400"
               />
+
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={resendTimer > 0 || loading}
+                  className={`text-sm font-medium ${
+                    resendTimer > 0 || loading
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-blue-600 hover:underline'
+                  }`}
+                >
+                  {resendTimer > 0
+                    ? `Resend OTP in ${resendTimer}s`
+                    : 'Resend OTP'}
+                </button>
+
+                {error && (
+                  <p className="text-sm text-red-600 text-right max-w-[60%]">
+                    {error}
+                  </p>
+                )}
+              </div>
             </div>
+          )}
+
+          {!otpSent && error && (
+            <p className="text-sm text-red-600">{error}</p>
           )}
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white font-semibold py-4 rounded-lg hover:bg-blue-700 transition-colors text-lg"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white font-semibold py-4 rounded-lg hover:bg-blue-700 transition-colors text-lg disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {otpSent ? 'Verify & Continue' : 'Send OTP'}
+            {otpSent ? 'Verify & Continue' : loading ? 'Sending OTP...' : 'Send OTP'}
           </button>
         </form>
 
