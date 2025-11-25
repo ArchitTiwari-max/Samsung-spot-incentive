@@ -4,12 +4,28 @@ import { useState, useEffect } from 'react';
 import SECHeader from '@/components/sec/SECHeader';
 import SECFooter from '@/components/sec/SECFooter';
 
+function mapStoreLabel(store) {
+  if (!store) return '';
+  const parts = [store.name];
+  if (store.city) parts.push(store.city);
+  if (store.state) parts.push(store.state);
+  return parts.filter(Boolean).join(' - ');
+}
+
 export default function SecIncentiveForm({ initialSecId = '' }) {
   const [secId, setSecId] = useState(initialSecId);
   const [dateOfSale, setDateOfSale] = useState('');
-  const [storeName, setStoreName] = useState('');
-  const [deviceName, setDeviceName] = useState('');
-  const [planType, setPlanType] = useState('');
+  // storeId will hold the selected store's ID from the Store collection
+  const [storeId, setStoreId] = useState('');
+  const [storeOptions, setStoreOptions] = useState([]);
+  const [isLoadingStores, setIsLoadingStores] = useState(false);
+
+  // Samsung device dropdown options imported from Mongo via /api/samsungsku
+  const [deviceName, setDeviceName] = useState(''); // will hold selected SamsungSku id
+  const [deviceOptions, setDeviceOptions] = useState([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  const [planType, setPlanType] = useState(''); // will hold selected plan key, e.g. 'screenProtect1Yr'
   const [imeiNumber, setImeiNumber] = useState('');
   const [imeiError, setImeiError] = useState('');
   const [duplicateError, setDuplicateError] = useState('');
@@ -32,6 +48,55 @@ export default function SecIncentiveForm({ initialSecId = '' }) {
     }
   }, [initialSecId]);
 
+  // Load all stores for dropdown on mount
+  useEffect(() => {
+    async function loadStores() {
+      try {
+        setIsLoadingStores(true);
+        const res = await fetch('/api/stores');
+        if (!res.ok) {
+          console.error('Failed to load stores for SEC incentive form');
+          return;
+        }
+        const data = await res.json();
+        setStoreOptions(Array.isArray(data.stores) ? data.stores : []);
+      } catch (err) {
+        console.error('Error fetching stores for SEC incentive form', err);
+      } finally {
+        setIsLoadingStores(false);
+      }
+    }
+
+    loadStores();
+  }, []);
+
+  // Load Samsung device SKUs for dropdown on mount
+  useEffect(() => {
+    async function loadDevices() {
+      try {
+        setIsLoadingDevices(true);
+        const res = await fetch('/api/samsungsku');
+        if (!res.ok) {
+          console.error('Failed to load Samsung SKUs for SEC incentive form');
+          return;
+        }
+        const data = await res.json();
+        setDeviceOptions(Array.isArray(data.devices) ? data.devices : []);
+      } catch (err) {
+        console.error('Error fetching Samsung SKUs for SEC incentive form', err);
+      } finally {
+        setIsLoadingDevices(false);
+      }
+    }
+
+    loadDevices();
+  }, []);
+
+  // When device changes, reset the selected plan type
+  useEffect(() => {
+    setPlanType('');
+  }, [deviceName]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -51,12 +116,12 @@ export default function SecIncentiveForm({ initialSecId = '' }) {
       return;
     }
     
-    // Handle form submission
+    // Handle form submission (deviceName is SamsungSku id, planType is plan key)
     console.log({
       secId,
       dateOfSale,
-      storeName,
-      deviceName,
+      storeId,
+      deviceId: deviceName,
       planType,
       imeiNumber,
     });
@@ -296,25 +361,34 @@ export default function SecIncentiveForm({ initialSecId = '' }) {
 
             {/* Store Name */}
             <div>
-              <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="storeId" className="block text-sm font-medium text-gray-700 mb-2">
                 Store Name
               </label>
               <select
-                id="storeName"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                id="storeId"
+                value={storeId}
+                onChange={(e) => setStoreId(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                   backgroundRepeat: 'no-repeat',
                   backgroundPosition: 'right 1rem center',
                   backgroundSize: '1.25rem',
                 }}
+                disabled={isLoadingStores || storeOptions.length === 0}
               >
-                <option value="">Select Store</option>
-                <option value="store1">Store 1</option>
-                <option value="store2">Store 2</option>
-                <option value="store3">Store 3</option>
+                <option value="">
+                  {isLoadingStores
+                    ? 'Loading stores...'
+                    : storeOptions.length === 0
+                    ? 'No stores configured'
+                    : 'Select Store'}
+                </option>
+                {storeOptions.map((store) => (
+                  <option key={store.id} value={store.id}>
+                    {mapStoreLabel(store)}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -327,18 +401,27 @@ export default function SecIncentiveForm({ initialSecId = '' }) {
                 id="deviceName"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                   backgroundRepeat: 'no-repeat',
                   backgroundPosition: 'right 1rem center',
                   backgroundSize: '1.25rem',
                 }}
+                disabled={isLoadingDevices || deviceOptions.length === 0}
               >
-                <option value="">Select Device</option>
-                <option value="iphone">iPhone</option>
-                <option value="samsung">Samsung</option>
-                <option value="oneplus">OnePlus</option>
+                <option value="">
+                  {isLoadingDevices
+                    ? 'Loading devices...'
+                    : deviceOptions.length === 0
+                    ? 'No devices configured'
+                    : 'Search or select device'}
+                </option>
+                {deviceOptions.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.label || `${device.category} - ${device.modelName}`}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -347,23 +430,46 @@ export default function SecIncentiveForm({ initialSecId = '' }) {
               <label htmlFor="planType" className="block text-sm font-medium text-gray-700 mb-2">
                 Plan Type
               </label>
-              <select
-                id="planType"
-                value={planType}
-                onChange={(e) => setPlanType(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 1rem center',
-                  backgroundSize: '1.25rem',
-                }}
-              >
-                <option value="">Select Plan</option>
-                <option value="basic">Basic Plan</option>
-                <option value="premium">Premium Plan</option>
-                <option value="unlimited">Unlimited Plan</option>
-              </select>
+              {(() => {
+                const selectedDevice = deviceOptions.find((d) => d.id === deviceName);
+                const planOptions = selectedDevice?.plans || [];
+
+                const formatPrice = (price) => {
+                  if (price == null) return '';
+                  const n = Number(price);
+                  if (!Number.isFinite(n)) return '';
+                  return '₹' + n.toLocaleString('en-IN');
+                };
+
+                return (
+                  <select
+                    id="planType"
+                    value={planType}
+                    onChange={(e) => setPlanType(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-100 border-0 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 1rem center',
+                      backgroundSize: '1.25rem',
+                    }}
+                    disabled={!deviceName || planOptions.length === 0}
+                  >
+                    <option value="">
+                      {!deviceName
+                        ? 'Select device first'
+                        : planOptions.length === 0
+                        ? 'No plans for this device'
+                        : 'Select Plan'}
+                    </option>
+                    {planOptions.map((plan) => (
+                      <option key={plan.key} value={plan.key}>
+                        {`${plan.label} - ${formatPrice(plan.price)}`}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
             </div>
 
             {/* IMEI Number */}

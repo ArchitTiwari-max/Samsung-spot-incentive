@@ -17,15 +17,14 @@ async function main() {
   ];
 
   for (const store of stores) {
-    await prisma.store.upsert({
-      where: { id: store.id },
-      update: {
-        name: store.name,
-        city: store.city,
-        state: store.state,
-      },
-      create: store,
-    });
+    // Check if store exists, create only if it doesn't
+    const existing = await prisma.store.findUnique({ where: { id: store.id } });
+    if (!existing) {
+      await prisma.store.create({ data: store });
+      console.log(`Created store: ${store.name}`);
+    } else {
+      console.log(`Store already exists: ${store.name}`);
+    }
   }
 
   // ----- HELPERS FOR ZBM / ZSE -----
@@ -49,20 +48,17 @@ async function main() {
       });
     }
 
-    await prisma.zBM.upsert({
-      where: { userId: user.id },
-      update: {
-        fullName,
-        phone,
-        region,
-      },
-      create: {
-        userId: user.id,
-        fullName,
-        phone,
-        region,
-      },
-    });
+    const existingProfile = await prisma.zBM.findUnique({ where: { userId: user.id } });
+    if (!existingProfile) {
+      await prisma.zBM.create({
+        data: {
+          userId: user.id,
+          fullName,
+          phone,
+          region,
+        },
+      });
+    }
   }
 
   async function ensureZse(
@@ -85,20 +81,17 @@ async function main() {
       });
     }
 
-    await prisma.zSE.upsert({
-      where: { userId: user.id },
-      update: {
-        fullName,
-        phone,
-        region,
-      },
-      create: {
-        userId: user.id,
-        fullName,
-        phone,
-        region,
-      },
-    });
+    const existingProfile = await prisma.zSE.findUnique({ where: { userId: user.id } });
+    if (!existingProfile) {
+      await prisma.zSE.create({
+        data: {
+          userId: user.id,
+          fullName,
+          phone,
+          region,
+        },
+      });
+    }
   }
 
   // ----- 5 ZBMs (Indian names) -----

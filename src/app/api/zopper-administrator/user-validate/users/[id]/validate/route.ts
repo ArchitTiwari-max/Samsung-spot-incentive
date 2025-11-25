@@ -91,23 +91,25 @@ export async function POST(
     // Use a transaction so creation + user update is atomic
     const result = await prisma.$transaction(async (tx) => {
       if (user.role === 'ABM') {
+        // At this point validManagerId is guaranteed to be present for ABM
         await tx.aBM.create({
           data: {
             userId: user.id,
             fullName,
             phone,
             storeIds,
-            ...(validManagerId ? { zbmId: validManagerId } : {}),
+            zbmId: validManagerId as string,
           },
         });
       } else if (user.role === 'ASE') {
+        // At this point validManagerId is guaranteed to be present for ASE
         await tx.aSE.create({
           data: {
             userId: user.id,
             fullName,
             phone,
             storeIds,
-            ...(validManagerId ? { zseId: validManagerId } : {}),
+            zseId: validManagerId as string,
           },
         });
       } else if (user.role === 'ZBM') {

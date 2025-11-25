@@ -171,3 +171,24 @@ model ZopperAdmin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/// Samsung device SKU + plan prices imported from the Excel sheet
+model SamsungSku {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  /// e.g. "Luxury Fold", "Premium", "Mid" etc.
+  category  String
+  /// e.g. "Z Fold 6", "A55" etc.
+  modelName String @unique
+
+  /// Prices are stored as integer rupee amounts (e.g. 12999)
+  screenProtect1Yr     Int?
+  adld1Yr              Int?
+  combo2Yrs            Int?
+  extendedWarranty1Yr  Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("samsungsku")
+}
